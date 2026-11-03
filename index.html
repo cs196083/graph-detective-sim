@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>그래프 탐정 복습</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* 레이아웃 아이디어: 탐정의 사건 수첩. 왼쪽에 증거 그래프, 오른쪽에 따라 할 조사 단계를 둔다. */
+:root{
+  --paper:#f2f4f8; --sheet:#ffffff; --ink:#1a2438; --muted:#55617a; --line:#d5dbe6;
+  --accent:#2456c9; --accent-ink:#ffffff; --tint:#e2e9f8; --mark:#ffd23f;
+  --good:#0a7a5c; --bad:#c23a2b; --dot:rgba(36,86,201,.09);
+  --display:"Do Hyeon","IBM Plex Sans KR","Malgun Gothic",sans-serif;
+  --body:"IBM Plex Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+  --mono:"IBM Plex Mono",Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#10141f; --sheet:#1a2130; --ink:#e8ecf4; --muted:#a6b1c6; --line:#333e54;
+  --accent:#8fb0ff; --accent-ink:#0f1a33; --tint:#25324f; --mark:#ffd23f;
+  --good:#5fd6ae; --bad:#ff9384; --dot:rgba(143,176,255,.06); color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --paper:#10141f; --sheet:#1a2130; --ink:#e8ecf4; --muted:#a6b1c6; --line:#333e54;
+  --accent:#8fb0ff; --accent-ink:#0f1a33; --tint:#25324f; --mark:#ffd23f;
+  --good:#5fd6ae; --bad:#ff9384; --dot:rgba(143,176,255,.06); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background-color:var(--paper);color:var(--ink);font:400 16px/1.6 var(--body);word-break:keep-all;overflow-wrap:anywhere;
+  background-image:radial-gradient(var(--dot) 1.2px,transparent 1.3px);background-size:18px 18px}
+.wrap{max-width:1120px;margin:0 auto;padding:20px 20px 56px;display:grid;gap:18px}
+header.top{display:grid;gap:4px}
+.eyebrow{color:var(--muted);font-size:14px;font-weight:500}
+h1{font:400 34px/1.2 var(--display);margin:0;text-wrap:balance}
+h2{font:400 26px/1.3 var(--display);margin:0;text-wrap:balance}
+h3{font-size:17px;font-weight:700;margin:0;line-height:1.4}
+p{margin:0}
+.muted{color:var(--muted)}.small{font-size:14px}
+.progress{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;font-size:14px;font-weight:600}
+.pbar{height:10px;background:var(--line);border-radius:5px;overflow:hidden}
+.pbar i{display:block;height:100%;width:0;background:var(--accent)}
+nav.tabs{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid var(--line);background:var(--sheet);border-radius:6px;overflow:hidden}
+nav.tabs a{display:grid;padding:9px 12px;color:var(--ink);text-decoration:none;border-right:1px solid var(--line);font-weight:600;line-height:1.35;font-size:15px}
+nav.tabs a:last-child{border-right:0}
+nav.tabs a span{color:var(--muted);font:500 12px var(--body)}
+nav.tabs a[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+nav.tabs a[aria-current="page"] span{color:inherit}
+.view{display:none;gap:18px}.view.on{display:grid}
+.lead{display:grid;gap:6px;max-width:72ch}
+.panel{background:var(--sheet);border:1px solid var(--line);border-radius:6px;padding:18px;display:grid;gap:12px;align-content:start;min-width:0}
+.two{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+.stack{display:grid;gap:12px;min-width:0;align-content:start}
+.sticky{position:sticky;top:12px}
+.plot{background:#fff;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.plot svg{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:14px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+button,select,input[type=text],input[type=number],textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:var(--sheet);border:1px solid var(--line);border-radius:5px;padding:7px 12px;font-weight:600;min-height:40px;text-align:left}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button[aria-pressed="true"]{background:var(--tint);border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+button.right{border-color:var(--good);box-shadow:inset 0 0 0 1px var(--good)}
+button.wrong{border-color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.step{border-left:4px solid var(--line);padding:2px 0 2px 12px;display:grid;gap:8px}
+.step.done{border-left-color:var(--good)}
+.step>h3{display:flex;gap:8px;justify-content:space-between;align-items:baseline}
+.tick{font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap}
+.step.done .tick{color:var(--good)}
+.opts{display:grid;gap:6px}
+.fb{font-size:15px;font-weight:500}.fb.ok{color:var(--good)}.fb.no{color:var(--bad)}
+label.field{display:grid;gap:4px;font-weight:600;font-size:15px}
+input[type=text],input[type=number],textarea,select{background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:8px 10px;width:100%;font-weight:400}
+textarea{min-height:68px;resize:vertical}
+input[type=range]{width:100%;accent-color:var(--accent);height:30px}
+details{font-size:15px}summary{cursor:pointer;font-weight:600;color:var(--accent);min-height:28px}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tile{border:1px solid var(--line);border-radius:5px;padding:9px 11px;min-width:0}
+.tile b{display:block;font:600 21px/1.25 var(--mono);font-variant-numeric:tabular-nums}
+.tile span{font-size:13px;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:middle}
+th{background:var(--tint);font-weight:600}
+td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+tr.hit td{background:var(--mark);color:#1a2438;font-weight:600}
+.scroll{overflow-x:auto}
+.seg{display:inline-flex;gap:4px}.seg button{min-width:42px;text-align:center;padding:6px 8px}
+.ex{font-size:14px;color:var(--muted);display:block;margin-top:3px}
+pre.record{white-space:pre-wrap;background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:12px;margin:0;font:400 14px/1.6 var(--body);max-height:300px;overflow:auto}
+.check{display:flex;gap:8px;align-items:center;min-height:36px;font-weight:500}
+.check input{width:19px;height:19px;accent-color:var(--accent);flex:none}
+.core{border-left:6px solid var(--mark);padding:2px 0 2px 12px;font-weight:600}
+.pager{display:flex;justify-content:space-between;gap:8px}.pager a{color:var(--accent);font-weight:600}
+@media (max-width:820px){
+  .two{grid-template-columns:minmax(0,1fr)}.sticky{position:static}
+  nav.tabs a{padding:7px 4px;font-size:13px;text-align:center}
+  h1{font-size:28px}
+}
+@media (max-width:440px){.wrap{padding:14px 16px 40px}nav.tabs a span{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">중학교 정보 · Ⅱ. 데이터 · 그래프 탐정 복습</div>
+    <h1>그래프 탐정 복습</h1>
+    <p class="muted">사람을 속이는 그래프는 어떻게 생겼을까요? 느낌이 아니라 근거로 판정해 봅시다.</p>
+  </header>
+  <div class="progress"><div class="pbar"><i id="pbar"></i></div><span id="ptext"></span></div>
+  <nav class="tabs" aria-label="복습 단계">
+    <a href="#case" data-v="case"><span>도입</span>사건 접수</a>
+    <a href="#basic" data-v="basic"><span>활동 1</span>기본 조사</a>
+    <a href="#mission" data-v="mission"><span>활동 2</span>사건 미션</a>
+    <a href="#check" data-v="check"><span>활동 3</span>체크리스트</a>
+    <a href="#close" data-v="close"><span>활동 4</span>최종 판정</a>
+  </nav>
+
+  <section class="view" id="v-case">
+    <div class="lead"><h2>이 그래프, 믿어도 될까요?</h2>
+      <p>먼저 그래프가 하는 말을 읽고, 지금 느낌대로 투표하세요. 마지막 단계에서 근거를 모아 다시 판정합니다.</p></div>
+    <div class="two">
+      <div class="panel sticky"><div class="plot" id="caseChart"></div><p class="small muted">수업용으로 만든 가상의 그래프입니다.</p></div>
+      <div class="stack panel" id="caseSteps"></div>
+    </div>
+    <div class="pager"><span></span><a href="#basic">다음: 기본 조사</a></div>
+  </section>
+
+  <section class="view" id="v-basic">
+    <div class="lead"><h2>증거의 기본 정보를 확인합니다</h2><p>같은 그래프에서 제목의 표현과 자료 정보를 하나씩 점검하세요.</p></div>
+    <div class="two">
+      <div class="panel sticky"><div class="plot" id="basicChart"></div></div>
+      <div class="stack panel" id="basicSteps"></div>
+    </div>
+    <div class="pager"><a href="#case">이전: 사건 접수</a><a href="#mission">다음: 사건 미션</a></div>
+  </section>
+
+  <section class="view" id="v-mission">
+    <div class="lead"><h2>다섯 가지 사건을 해결합니다</h2><p>왼쪽 그래프를 직접 바꿔 보며 오른쪽 단계를 차례로 따라 하세요.</p></div>
+    <div class="row" id="mTabs"></div>
+    <div id="mBody"></div>
+    <div class="pager"><a href="#basic">이전: 기본 조사</a><a href="#check">다음: 체크리스트</a></div>
+  </section>
+
+  <section class="view" id="v-check">
+    <div class="lead"><h2>체크리스트 10으로 근거를 모읍니다</h2>
+      <p>도입의 급식 그래프를 다시 점검하세요. 잘 지켰으면 ○, 보통이면 △, 미흡하거나 없으면 ×입니다. 5개 이상 표시한 뒤 예시 판정과 비교하세요.</p></div>
+    <div class="two">
+      <div class="panel sticky"><div class="plot" id="checkChart"></div></div>
+      <div class="stack">
+        <div class="panel"><div class="scroll"><table><thead><tr><th>번호·항목</th><th>판정</th></tr></thead><tbody id="ckRows"></tbody></table></div>
+          <div class="row"><button id="ckShow" class="primary">예시 판정과 비교하기</button><span class="fb" id="ckFb" role="status"></span></div></div>
+        <div class="panel" id="ckTop"></div>
+      </div>
+    </div>
+    <div class="pager"><a href="#mission">이전: 사건 미션</a><a href="#close">다음: 최종 판정</a></div>
+  </section>
+
+  <section class="view" id="v-close">
+    <div class="lead"><h2>그래프를 고치고 사건을 종결합니다</h2><p>문제 항목을 고치면 그래프가 어떻게 달라지는지 보고, 최종 판정과 해석 문장을 완성하세요.</p></div>
+    <div class="two">
+      <div class="panel sticky"><div class="plot" id="fixChart"></div><div class="row small" id="fixMeta"></div><p class="small muted">고친 그래프의 출처, 기간, 표본도 수업용 가상 정보입니다.</p></div>
+      <div class="stack panel" id="closeSteps"></div>
+    </div>
+    <div class="panel"><p class="core">그래프는 보이는 것이 아니라 출처·단위·축·표본 등을 점검해 신뢰도를 판단해야 하며, 상관을 인과로 단정하면 오류가 됩니다.</p></div>
+    <div class="panel"><h3>내 복습 기록</h3>
+      <label class="field">학년 반 번호 이름 <input type="text" id="who" data-t placeholder="예: 1학년 2반 3번 ○○○"></label>
+      <pre class="record" id="record"></pre>
+      <div class="row"><button id="copyRec" class="primary">기록 복사하기</button><span class="small" id="recFb" role="status"></span></div>
+      <p class="small muted">답은 어디에도 저장되지 않습니다. 페이지를 닫기 전에 복사해 과제 제출 칸에 붙여 넣으세요.</p></div>
+    <div class="pager"><a href="#check">이전: 체크리스트</a><span></span></div>
+  </section>
+</div>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const el=(t,a={},...k)=>{const e=document.createElement(t);for(const n in a){if(n==='class')e.className=a[n];else if(n==='text')e.textContent=a[n];else if(n==='html')e.innerHTML=a[n];else e.setAttribute(n,a[n]);}k.forEach(c=>c!=null&&e.append(c));return e;};
+const C={m:'#2F6FDE',f:'#D6408F',lo:'#0B8F7A',hi:'#B97A00',g:'#6d7a92'};
+const INK='#1a2438',SUB='#55617a',GRID='#e4e8ef';
+const FONT='font-family="IBM Plex Sans KR,Malgun Gothic,sans-serif"';
+
+/* ---------- 진행 상황 ---------- */
+const TASKS=new Set(),DONE=new Set();
+const setTick=id=>{document.querySelectorAll(`[data-step="${id}"]`).forEach(s=>{s.classList.add('done');const t=s.querySelector('.tick');if(t)t.textContent='완료';});};
+function mark(id){DONE.add(id);setTick(id);prog();renderRecord();}
+function prog(){const n=TASKS.size,d=[...DONE].filter(x=>TASKS.has(x)).length;$('pbar').style.width=(n?d/n*100:0)+'%';$('ptext').textContent=`복습 진행 ${d} / ${n}`;}
+function step(id,title,...kids){TASKS.add(id);const s=el('div',{class:'step'+(DONE.has(id)?' done':''),'data-step':id},el('h3',{},el('span',{text:title}),el('span',{class:'tick',text:DONE.has(id)?'완료':'할 일'})),...kids);return s;}
+
+/* ---------- 입력 도구 ---------- */
+const T={};
+function txt(id,label,ph='',area=false){const i=el(area?'textarea':'input',{id,placeholder:ph});if(!area)i.type='text';i.value=T[id]||'';i.addEventListener('input',()=>{T[id]=i.value;renderRecord();});return el('label',{class:'field'},el('span',{text:label}),i);}
+const P={};
+function mcq(id,opts,a,ex,onRight){
+  const fb=el('p',{class:'fb',role:'status'}),box=el('div',{class:'opts'});
+  const multi=Array.isArray(a);P[id]=P[id]||(multi?[]:null);
+  const check=()=>{const ok=multi?(P[id].length===a.length&&a.every(x=>P[id].includes(x))):P[id]===a;
+    fb.className='fb '+(ok?'ok':'no');fb.textContent=(ok?'맞습니다. ':'다시 살펴보세요. ')+(ok?ex:'그래프와 표의 숫자를 다시 확인해 보세요.');
+    if(ok){mark(id);if(onRight)onRight();}};
+  const draw=()=>box.replaceChildren(...opts.map(o=>{const on=multi?P[id].includes(o):P[id]===o;const b=el('button',{type:'button',text:o,'aria-pressed':String(on)});
+    if(on&&!multi&&a!==null)b.className=o===a?'right':'wrong';
+    b.onclick=()=>{if(multi)P[id]=on?P[id].filter(x=>x!==o):[...P[id],o];else P[id]=o;draw();if(a===null){if(onRight)onRight();}else if(!multi)check();};return b;}));
+  draw();const kids=[box,fb];
+  if(multi)kids.splice(1,0,Object.assign(el('button',{type:'button',class:'primary',text:'답 확인'}),{onclick:check}));
+  if(P[id]&&a!==null&&(!multi||DONE.has(id)))check();
+  return el('div',{class:'stack',style:'gap:8px'},...kids);
+}
+function sample(text){return el('details',{},el('summary',{text:'예시 답안 보기'}),el('p',{text}));}
+
+/* ---------- 차트 ---------- */
+function barPath(x,y,w,y0){const r=Math.min(4,w/2,Math.max(0,y0-y));return `M${x} ${y0}V${y+r}Q${x} ${y} ${x+r} ${y}H${x+w-r}Q${x+w} ${y} ${x+w} ${y+r}V${y0}Z`;}
+function bars({title,cats,series,lo=0,hi,step:st,fmt=v=>String(v),tick=fmt,unit='',W=640,H=350}){
+  const L=60,R=14,Tp=title?64:22,B=44,y=v=>Tp+(H-Tp-B)*(1-(v-lo)/(hi-lo)),base=H-B,gw=(W-L-R)/cats.length,n=series.length,bw=Math.min(46,gw*.66/n);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title||'막대그래프'}" ${FONT}>`;
+  if(title)s+=`<text x="${L-40}" y="30" font-size="21" font-weight="700" fill="${INK}">${title}</text>`;
+  if(unit)s+=`<text x="${L-8}" y="${Tp-10}" font-size="13" fill="${SUB}" text-anchor="end">${unit}</text>`;
+  const stp=st||(hi-lo)/5;
+  for(let v=lo;v<=hi+1e-9;v+=stp){const Y=y(v);s+=`<line x1="${L}" x2="${W-R}" y1="${Y}" y2="${Y}" stroke="${v===lo?'#9aa5b8':GRID}"/><text x="${L-8}" y="${Y+5}" font-size="14" text-anchor="end" fill="${SUB}">${tick(Math.round(v*1000)/1000)}</text>`;}
+  cats.forEach((c,i)=>{const gx=L+gw*i+gw/2,tot=n*bw+(n-1)*2;
+    series.forEach((sr,j)=>{const x=gx-tot/2+j*(bw+2),v=sr.vals[i],Y=y(v);
+      s+=`<g><title>${c} · ${sr.name}: ${fmt(v)}</title><path d="${barPath(x,Y,bw,base)}" fill="${sr.color}"/><text x="${x+bw/2}" y="${Y-6}" font-size="${n>1?13:15}" font-weight="600" text-anchor="middle" fill="${INK}">${fmt(v)}</text></g>`;});
+    s+=`<text x="${gx}" y="${H-16}" font-size="14" text-anchor="middle" fill="${INK}">${c}</text>`;});
+  return s+'</svg>';
+}
+function line({title,labels,vals,lo,hi,stp}){
+  const W=640,H=350,L=70,R=20,Tp=64,B=40,x=i=>L+(W-L-R)*i/(labels.length-1),y=v=>Tp+(H-Tp-B)*(1-(v-lo)/(hi-lo));
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}" ${FONT}><text x="20" y="30" font-size="21" font-weight="700" fill="${INK}">${title}</text>`;
+  s+=`<text x="${L-8}" y="${Tp-12}" font-size="13" fill="${SUB}" text-anchor="end">원</text>`;
+  for(let v=lo;v<=hi;v+=stp){const Y=y(v);s+=`<line x1="${L}" x2="${W-R}" y1="${Y}" y2="${Y}" stroke="${v===lo?'#9aa5b8':GRID}"/><text x="${L-8}" y="${Y+5}" font-size="14" text-anchor="end" fill="${SUB}">${v.toLocaleString()}</text>`;}
+  s+=`<polyline fill="none" stroke="${C.m}" stroke-width="3" points="${vals.map((v,i)=>x(i)+','+y(v)).join(' ')}"/>`;
+  vals.forEach((v,i)=>{s+=`<g><title>${labels[i]}: ${v.toLocaleString()}원</title><circle cx="${x(i)}" cy="${y(v)}" r="6" fill="${C.m}" stroke="#fff" stroke-width="2"/></g><text x="${x(i)}" y="${H-14}" font-size="14" text-anchor="middle" fill="${INK}">${labels[i]}</text>`;});
+  [0,vals.length-1].forEach(i=>{s+=`<text x="${x(i)}" y="${y(vals[i])-12}" font-size="14" font-weight="600" text-anchor="middle" fill="${INK}">${vals[i].toLocaleString()}</text>`;});
+  return s+'</svg>';
+}
+const legend=list=>el('div',{class:'legend'},...list.map(([n,c])=>{const i=el('i');i.style.background=c;return el('span',{},i,n);}));
+
+/* ---------- 도입 그래프 ---------- */
+const FIX=[['t','제목을 단정 없이 바꾸기',1],['p','조사 기간 넣기',2],['s','출처 넣기',3],['u','단위 넣기',4],['a','세로축을 0부터 시작하기',5],['n','표본 수 밝히고 충분히 조사하기',6]];
+const fixOn={};
+function caseSvg(f={}){const a=f.a;
+  return bars({title:f.t?'새 메뉴 도입 전후 급식 만족도 비교':'새 메뉴 덕분에 급식 만족도 확실히 폭증!',
+    cats:[f.p?'도입 전 (2025년 4월)':'새 메뉴 전',f.p?'도입 후 (2025년 10월)':'새 메뉴 후'],series:[{name:'만족도',color:C.m,vals:[72,78]}],lo:a?0:70,hi:a?100:80,step:a?20:2,fmt:v=>f.u?v+'%':String(v),tick:v=>String(v),unit:f.u?'%':''});}
+$('caseChart').innerHTML=$('basicChart').innerHTML=$('checkChart').innerHTML=caseSvg();
+[$('caseChart'),$('basicChart'),$('checkChart')].forEach(b=>b.append(el('p',{class:'small',style:'margin:0;padding:0 14px 10px;color:#55617a;font-size:13px',text:'조사 대상: 전 전교생 / 후 급식실 앞 12명'})));
+
+/* ---------- 도입·활동 1 ---------- */
+$('caseSteps').append(
+ el('h3',{text:'따라 하기'}),
+ step('c1','1. 그래프의 주장 한 문장 쓰기',txt('claim','이 그래프는 ___라고 주장한다.','예: 새 메뉴 때문에 만족도가 크게 올랐다고 주장한다.')),
+ step('c2','2. 지금 느낌대로 투표하기',mcq('vote0',['신뢰','주의','불신'],null,'',()=>{const f=document.querySelector('[data-step="c2"] .fb');f.className='fb';f.textContent=`${P.vote0}(으)로 투표했습니다. 마지막에 다시 판정합니다.`;mark('c2');})),
+ step('c3','3. 왜 그렇게 생각했나요?',txt('vote0why','이유 한 가지','예: 막대 차이가 너무 커 보인다.'))
+);
+$('claim').addEventListener('input',e=>{if(e.target.value.trim())mark('c1');});$('vote0why').addEventListener('input',e=>{if(e.target.value.trim())mark('c3');});
+$('basicSteps').append(
+ el('h3',{text:'따라 하기'}),
+ step('b1','1. 제목에서 단정·과장 표현 모두 고르기',mcq('b1',['새 메뉴 덕분에','급식 만족도','확실히','폭증'],['새 메뉴 덕분에','확실히','폭증'],'‘확실히’와 ‘폭증’은 과장·단정 표현이고, ‘덕분에’는 원인을 단정합니다.')),
+ step('b2','2. 자료 유형은 무엇인가요?',mcq('b2',['막대그래프','꺾은선그래프','원그래프','표'],'막대그래프','막대 높이로 두 시기를 비교하는 그래프입니다.')),
+ step('b3','3. 출처와 조사 기간은 확인되나요?',mcq('b3',['출처만 있다','기간만 있다','둘 다 있다','둘 다 확인 불가'],'둘 다 확인 불가','기관명도 날짜도 없어 언제, 누가 조사했는지 알 수 없습니다.')),
+ step('b4','4. 표본 수(n)는 충분한가요?',mcq('b4',['전후 모두 전교생이라 충분하다','전은 인원 불명, 후는 12명이라 부족하다','표본은 중요하지 않다'],'전은 인원 불명, 후는 12명이라 부족하다','‘후’의 12명은 전체를 대표하기 어렵고, 전후 조사 대상도 다릅니다.')),
+ step('b5','5. 내가 믿기 어려운 이유 쓰기',txt('why1','이유 한 문장','예: 기간이 없어서 언제의 데이터인지 모르겠다.'))
+);
+setTimeout(()=>$('why1').addEventListener('input',e=>{if(e.target.value.trim())mark('b5');}));
+
+/* ---------- 미션 ---------- */
+const CAT=['군것질','물건 사기','여가생활','피시방 및 노래방','카페'],BOY=[42,15,8,28,7],GIRL=[16,14,4,10,6];
+const REL_B=BOY.map(v=>v/100),REL_G=GIRL.map(v=>v/50);
+const GAME={b:[[115,64],[121,81]],g:[[36,7],[129,28]]};
+const pct=(a,b)=>Math.round(a/b*1000)/10;
+const M={m1:{boost:false},m2:{mode:'count'},m3:{start:18000},m4:{split:false},m5:{rel:false}};
+function tblFreq(rel){return el('div',{class:'scroll',html:`<table><thead><tr><th>영역</th><th>남학생</th><th>여학생</th></tr></thead><tbody>${CAT.map((c,i)=>`<tr><td>${c}</td><td class="num">${rel?REL_B[i].toFixed(2):BOY[i]}</td><td class="num">${rel?REL_G[i].toFixed(2):GIRL[i]}</td></tr>`).join('')}<tr><th>합계</th><td class="num">${rel?'1.00':'100명'}</td><td class="num">${rel?'1.00':'50명'}</td></tr></tbody></table>`});}
+const MISS=[
+ {id:'m1',name:'미션 1 집단 크기',fig:'그림 1 용돈을 많이 쓰는 영역',head:'집단 크기의 함정을 찾아라',
+  chart(){const b=M.m1.boost;return [bars({title:'용돈을 많이 쓰는 영역',cats:CAT,series:[{name:'남학생',color:C.m,vals:BOY},{name:b?'여학생 (100명으로 환산)':'여학생',color:C.f,vals:b?GIRL.map(v=>v*2):GIRL}],hi:50,step:10,unit:'명'}),legend([['남학생 100명',C.m],[b?'여학생 50명을 100명으로 환산':'여학생 50명',C.f]]),tblFreq(false)];},
+  steps(){return [
+   step('m1a','1. 표 맨 아래 합계 비교하기',el('p',{text:'남학생 조사 인원은 여학생의 몇 배인가요?'}),mcq('m1a',['같다','2배','5배'],'2배','남학생 100명, 여학생 50명으로 조사 인원부터 다릅니다.')),
+   step('m1b','2. 인원을 같게 맞춰 보기',Object.assign(el('button',{type:'button',class:'primary',text:M.m1.boost?'원래 인원으로 되돌리기':'여학생도 100명이라고 환산하기'}),{onclick(){M.m1.boost=!M.m1.boost;mark('m1b');showM();}})),
+   step('m1c','3. 왜 위험한 결론인가요?',mcq('m1c',['남학생을 더 많이 조사해서 명수만으로는 비교할 수 없다','그래프 색이 달라서','군것질은 조사 항목이 아니라서'],'남학생을 더 많이 조사해서 명수만으로는 비교할 수 없다','인원이 같다고 보면 군것질은 42명 대 32명으로 차이가 크게 줄어듭니다.'),txt('a1','내 답변','“남학생이 훨씬 더 자주 군것질을 한다”는 결론이 위험한 이유',true),sample('남학생 100명, 여학생 50명으로 조사 인원이 달라서 명수를 그대로 비교하면 차이가 과장될 수 있다.'))];}},
+ {id:'m2',name:'미션 2 상관과 인과',fig:'그림 4 게임 시간과 평균 점수 미도달자',head:'상관관계는 인과관계가 아니다',
+  chart(){const md=M.m2.mode,leg=[['2시간 미만',C.lo],['2시간 이상',C.hi]];
+   if(md==='all'){const a=[pct(71,151),pct(109,250)];return [bars({title:'성별을 합쳐서 본 미도달 비율',cats:['남녀 전체'],series:[{name:'2시간 미만',color:C.lo,vals:[a[0]]},{name:'2시간 이상',color:C.hi,vals:[a[1]]}],hi:100,step:20,fmt:v=>v+'%',tick:v=>v,unit:'%'}),legend(leg),el('p',{class:'small',text:'2시간 미만 71/151명, 2시간 이상 109/250명'})];}
+   const rate=md==='rate',f=([n,k])=>rate?pct(k,n):k;
+   return [bars({title:rate?'평균 점수 미도달 비율':'평균 점수 미도달자 수',cats:['남학생','여학생'],series:[{name:'2시간 미만',color:C.lo,vals:[f(GAME.b[0]),f(GAME.g[0])]},{name:'2시간 이상',color:C.hi,vals:[f(GAME.b[1]),f(GAME.g[1])]}],hi:rate?100:100,step:20,fmt:v=>rate?v+'%':String(v),tick:v=>v,unit:rate?'%':'명'}),legend(leg),
+    el('div',{class:'scroll',html:`<table><thead><tr><th>구분</th><th>조사 인원</th><th>미도달자</th><th>비율</th></tr></thead><tbody>${[['남 2시간 미만',...GAME.b[0]],['남 2시간 이상',...GAME.b[1]],['여 2시간 미만',...GAME.g[0]],['여 2시간 이상',...GAME.g[1]]].map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num">${r[2]}</td><td class="num">${pct(r[2],r[1])}%</td></tr>`).join('')}</tbody></table>`})];},
+  steps(){const sw=(k,l)=>{const b=el('button',{type:'button',text:l,'aria-pressed':String(M.m2.mode===k)});b.onclick=()=>{M.m2.mode=k;if(k==='all')mark('m2b');showM();};return b;};return [
+   step('m2a','1. 명수를 비율로 바꿔 보기',el('div',{class:'row'},sw('count','명수로 보기'),sw('rate','비율로 보기')),el('p',{text:'남학생 2시간 이상의 미도달 비율은 얼마인가요?'}),mcq('m2a',['약 56%','약 67%','약 81%'],'약 67%','81 ÷ 121 ≈ 66.9%입니다. 남학생 2시간 미만은 약 55.7%입니다.')),
+   step('m2b','2. 성별을 합쳐 보기',sw('all','남녀 합쳐서 보기'),el('p',{text:'성별로 나누면 두 집단 모두 2시간 이상의 비율이 높은데, 합치면 왜 뒤집힐까요?'}),mcq('m2c',['여학생이 2시간 이상 집단에 많이 몰려 있고, 여학생의 미도달 비율이 낮아서','계산이 틀려서','합치면 언제나 뒤집혀서'],'여학생이 2시간 이상 집단에 많이 몰려 있고, 여학생의 미도달 비율이 낮아서','2시간 이상 250명 중 129명이 여학생입니다. 묶는 방식만 바꿔도 메시지가 달라지므로 비교 조건을 봐야 합니다.')),
+   step('m2d','3. 제3변수 후보 2가지 쓰기',txt('a2a','제3변수 후보 1','결과에 함께 영향을 줄 수 있는 다른 원인'),txt('a2b','제3변수 후보 2',''),sample('수면 시간, 공부 시간, 가정의 학습 지도, 스트레스 등이 게임 시간과 성적에 함께 영향을 줄 수 있다.'))];},
+  after(){const t=()=>{if((T.a2a||'').trim()&&(T.a2b||'').trim())mark('m2d');};$('a2a').addEventListener('input',t);$('a2b').addEventListener('input',t);}},
+ {id:'m3',name:'미션 3 축의 장난',fig:'그림 5 진혁 학생의 용돈 금액',head:'축의 장난을 간파하라',
+  chart(){const s=M.m3.start,st=s>=12000?2000:5000,hi=s+st*Math.ceil((32000-s)/st),V=[20000,20000,22000,25000,27000,28000,30000];
+   return [line({title:'진혁이의 용돈 금액 변화',labels:['초1','초2','초3','초4','초5','초6','중1'],vals:V,lo:s,hi,stp:st}),
+    el('div',{class:'tiles'},el('div',{class:'tile'},el('b',{text:s.toLocaleString()}),el('span',{text:'세로축 시작점'})),el('div',{class:'tile'},el('b',{text:'1.5배'}),el('span',{text:'실제 금액 증가'})),el('div',{class:'tile'},el('b',{text:((30000-s)/(20000-s)).toFixed(1)+'배'}),el('span',{text:'축 바닥에서 잰 높이 증가'})))];},
+  steps(){const r=el('input',{type:'range',id:'m3r',min:0,max:18000,step:2000,value:M.m3.start,'aria-label':'세로축 시작점'});r.oninput=()=>{M.m3.start=+r.value;redrawChart();if(M.m3.start===0)mark('m3a');};
+   const n=el('input',{type:'number',id:'m3n',placeholder:'숫자만 입력'}),fb=el('p',{class:'fb',role:'status'});
+   const b=el('button',{type:'button',class:'primary',text:'시작점 확인'});b.onclick=()=>{const ok=+n.value===18000;fb.className='fb '+(ok?'ok':'no');fb.textContent=ok?'맞습니다. 그림 5의 오른쪽 그래프는 18,000원에서 시작합니다.':'그래프 맨 아래 눈금 숫자를 다시 보세요.';if(ok)mark('m3b');};
+   return [
+   step('m3b','1. 처음 화면에서 세로축 시작점 찾기',el('p',{text:'지금 그래프 맨 아래 눈금은 얼마인가요? 활동지의 오른쪽 그래프와 같습니다.'}),n,b,fb),
+   step('m3a','2. 슬라이더를 0까지 내려 보기',r,el('p',{class:'small muted',text:'자료의 값은 그대로인데 기울기만 달라집니다. 시작점이 높을수록 높이 비교가 부풀려집니다.'})),
+   step('m3c','3. 어떤 효과가 생기나요?',mcq('m3c',['작은 변화가 크게 오른 것처럼 보인다','실제 금액이 늘어난다','변화가 작게 보인다'],'작은 변화가 크게 오른 것처럼 보인다','값은 1.5배인데 시작점 18,000원 기준 높이는 6배입니다. 꺾은선은 0에서 시작하지 않기도 하지만, 시작점을 꼭 확인해야 합니다.'),txt('a3','효과 설명','',true))];}},
+ {id:'m4',name:'미션 4 묶고 나누기',fig:'그림 3 남학생이 용돈을 많이 쓰는 영역',head:'그룹화의 의도를 찾아라',
+  chart(){const s=M.m4.split,cats=s?['군것질','물건 사기','여가생활','피시방','노래방','카페']:CAT,vals=s?[42,15,8,15,13,7]:BOY,ord=cats.map((c,i)=>[c,vals[i]]).sort((a,b)=>b[1]-a[1]);
+   let rank=0,prev=null;const rows=ord.map(([c,v],i)=>{if(v!==prev){rank=i+1;prev=v;}return `<tr><td class="num">${rank}위</td><td>${c}</td><td class="num">${v}명</td></tr>`;}).join('');
+   return [bars({title:'남학생이 용돈을 많이 쓰는 영역',cats,series:[{name:'남학생',color:C.m,vals}],hi:50,step:10,unit:'명'}),el('div',{class:'scroll',html:`<table><thead><tr><th>순위</th><th>영역</th><th>인원</th></tr></thead><tbody>${rows}</tbody></table>`})];},
+  steps(){return [
+   step('m4a','1. 합친 상태의 순위 보기',el('p',{text:'합쳐 놓았을 때 2위는 어느 영역인가요?'}),mcq('m4a',['물건 사기','피시방 및 노래방','카페'],'피시방 및 노래방','28명으로 군것질 다음입니다.')),
+   step('m4b','2. 항목을 나눠 보기',Object.assign(el('button',{type:'button',class:'primary',text:M.m4.split?'다시 합치기':'피시방과 노래방 나누기'}),{onclick(){M.m4.split=!M.m4.split;mark('m4b');showM();}})),
+   step('m4c','3. 메시지가 어떻게 달라졌나요?',mcq('m4c',['피시방 15명은 물건 사기와 공동 2위, 노래방 13명은 4위가 된다','피시방이 1위가 된다','순위는 전혀 바뀌지 않는다'],'피시방 15명은 물건 사기와 공동 2위, 노래방 13명은 4위가 된다','같은 자료도 묶는 방법에 따라 인상이 달라집니다.'),txt('a4','내 분석','',true))];}},
+ {id:'m5',name:'미션 5 비율로 비교',fig:'그림 2 상대도수로 나타낸 자료',head:'공정한 비교의 시작',
+  chart(){const r=M.m5.rel;return [bars({title:r?'영역별 상대도수':'영역별 인원',cats:CAT,series:[{name:'남학생',color:C.m,vals:r?REL_B:BOY},{name:'여학생',color:C.f,vals:r?REL_G:GIRL}],hi:r?.5:50,step:r?.1:10,fmt:v=>r?v.toFixed(2):String(v),tick:v=>r?v.toFixed(1):String(v),unit:r?'':'명'}),legend([['남학생',C.m],['여학생',C.f]]),tblFreq(r)];},
+  steps(){return [
+   step('m5a','1. 상대도수로 바꾸기',Object.assign(el('button',{type:'button',class:'primary',text:M.m5.rel?'명수로 되돌리기':'상대도수로 바꾸기'}),{onclick(){M.m5.rel=!M.m5.rel;mark('m5a');showM();}}),el('p',{class:'small muted',text:'상대도수 = 해당 인원 ÷ 집단 전체 인원입니다.'})),
+   step('m5b','2. 여학생의 비율이 더 높은 영역 모두 고르기',mcq('m5b',['군것질','물건 사기','여가생활','피시방 및 노래방','카페'],['물건 사기','카페'],'명수는 남학생이 모두 많았지만, 비율로는 물건 사기(0.15 대 0.28)와 카페(0.07 대 0.12)가 역전됩니다. 여가생활은 0.08로 같습니다.')),
+   step('m5c','3. 수정된 결론 쓰기',txt('a5','수정된 결론','',true),sample('군것질은 남학생의 비율이 조금 더 높지만 명수만큼 큰 차이는 아니고, 물건 사기와 카페는 오히려 여학생의 비율이 더 높을 수 있다.'))];},
+  after(){$('a5').addEventListener('input',e=>{if(e.target.value.trim())mark('m5c');});}}
+];
+let mi=0,chartBox=null;
+function redrawChart(){const items=MISS[mi].chart();chartBox.replaceChildren(el('div',{class:'plot',html:items[0]}),...items.slice(1));}
+function showM(){const m=MISS[mi];
+  $('mTabs').replaceChildren(...MISS.map((x,i)=>{const b=el('button',{type:'button',text:x.name,'aria-pressed':String(i===mi)});b.onclick=()=>{mi=i;showM();};return b;}));
+  chartBox=el('div',{class:'stack'});
+  const right=el('div',{class:'stack panel'},el('h3',{text:`따라 하기: ${m.head}`}),...m.steps());
+  const left=el('div',{class:'panel sticky'},el('p',{class:'small muted',text:`근거 자료: ${m.fig}`}),chartBox);
+  $('mBody').replaceChildren(el('div',{class:'two'},left,right));redrawChart();if(m.after)m.after();}
+MISS.forEach(m=>m.steps());// 전체 할 일 수를 먼저 등록
+
+/* ---------- 활동 3 ---------- */
+const CK=[['제목이 과장되거나 단정적이지 않은가?','×','‘확실히’, ‘폭증’은 단정·과장 표현입니다.'],['조사 기간이 명확히 적혀 있는가?','×','언제 조사했는지 없습니다.'],['믿을만한 출처(기관명 등)가 있는가?','×','조사 기관이 없습니다.'],['단위(명, %, 원 등)가 표시되었는가?','×','72, 78의 단위를 알 수 없습니다.'],['세로축이 0부터 시작하는가?','×','70에서 시작해 차이가 부풀려집니다.'],['조사 대상(표본 수)이 충분한가?','×','후 조사 인원이 12명뿐입니다.'],['비교 기준이 공평한가?','×','전은 전교생, 후는 급식실 앞 학생으로 대상이 다릅니다.'],['비율(%)과 절대값을 섞어 속이지 않았나?','△','단위가 없어 비율인지 점수인지 판단하기 어렵습니다.'],['상관관계를 인과관계처럼 말하지 않나?','×','‘덕분에’로 메뉴가 원인이라고 단정합니다.'],['생략되거나 빠진 중요한 정보가 없는가?','×','설문 문항, 응답률, 다른 변화 등이 빠져 있습니다.']];
+const ck=Array(10).fill(null);let ckOpen=false;
+function ckDraw(){$('ckRows').replaceChildren(...CK.map(([q,a,w],i)=>{const seg=el('div',{class:'seg',role:'group','aria-label':`${i+1}번 판정`});
+  ['○','△','×'].forEach(v=>{const b=el('button',{type:'button',text:v,'aria-pressed':String(ck[i]===v)});b.onclick=()=>{ck[i]=ck[i]===v?null:v;ckDraw();renderRecord();};seg.append(b);});
+  const c=el('td',{},`${i+1}. ${q}`);if(ckOpen)c.append(el('span',{class:'ex',text:`예시 ${a}: ${w}`}));return el('tr',{},c,el('td',{},seg));}));}
+$('ckShow').onclick=()=>{const n=ck.filter(Boolean).length;if(n<5){$('ckFb').className='fb no';$('ckFb').textContent=`지금 ${n}개입니다. 5개 이상 표시해 주세요.`;return;}
+  ckOpen=true;ckDraw();const same=ck.filter((v,i)=>v===CK[i][1]).length;$('ckFb').className='fb ok';$('ckFb').textContent=`표시한 ${n}개 중 ${same}개가 예시와 같습니다. 예시와 다르면 근거를 다시 생각해 보세요.`;mark('ck');};
+TASKS.add('ck');TASKS.add('top');
+const numSel=id=>{const s=el('select',{id,'aria-label':'항목 번호'});s.append(el('option',{value:'',text:'번호'}),...CK.map((_,i)=>el('option',{text:String(i+1)})));s.addEventListener('change',()=>{T[id]=s.value;if(T.top1&&T.top2&&T.top1!==T.top2)mark('top');renderRecord();});return s;};
+$('ckTop').append(el('h3',{text:'위험 요소 TOP 2'}),el('div',{class:'stack',style:'gap:6px'},el('label',{class:'field'},'1위 번호',numSel('top1')),txt('top1w','이유','')),el('div',{class:'stack',style:'gap:6px'},el('label',{class:'field'},'2위 번호',numSel('top2')),txt('top2w','이유','')));
+
+/* ---------- 활동 4 ---------- */
+function fixDraw(){const c=$('fixChart');c.innerHTML=caseSvg(fixOn);
+  const n=FIX.filter(f=>fixOn[f[0]]).length,meta=[];
+  meta.push(fixOn.s?'출처: 학생회 만족도 설문':'출처 없음');meta.push(fixOn.n?'표본: 전 312명, 후 298명':'표본: 전 불명, 후 12명');
+  $('fixMeta').textContent=`${meta.join(' · ')} · 고친 항목 ${n} / 6`;
+  if(n===6)mark('fix');}
+const fixBox=el('div',{class:'stack',style:'gap:2px'},...FIX.map(([k,l,no])=>{const i=el('input',{type:'checkbox',id:'fx'+k});i.onchange=()=>{fixOn[k]=i.checked;fixDraw();renderRecord();};return el('label',{class:'check'},i,`${no}번 ${l}`);}));
+const vSel=()=>mcq('vote1',['신뢰 (인용 가능)','주의 (참고용)','불신 (왜곡됨)'],'불신 (왜곡됨)','원래 그래프는 출처·기간·단위·축·표본이 모두 미흡합니다.',()=>mark('v'));
+$('closeSteps').append(
+ el('h3',{text:'따라 하기'}),
+ step('fix','1. 여섯 가지를 고쳐 보기',fixBox,el('p',{class:'small muted',text:'축을 0부터 그리면 72와 78의 차이가 실제 크기로 보입니다. 다 고쳐도 차이의 원인이 새 메뉴라고 단정할 수는 없습니다.'})),
+ step('v','2. 원래 그래프의 최종 신뢰도 판정',vSel(),txt('ev','근거 번호 3개','이 그래프는 (   )이다. 근거는 (  )번, (  )번, (  )번이다.')),
+ step('ice','3. 상관과 인과 구분하기',el('p',{text:'아이스크림 판매가 늘수록 익사 사고도 늘어납니다. 함께 움직이게 만드는 제3변수는 무엇일까요?'}),mcq('ice',['여름(기온 상승)','아이스크림 맛','수영복 색'],'여름(기온 상승)','더우면 아이스크림도 많이 팔리고 물놀이도 늘어납니다. 함께 변한다고 원인은 아닙니다.')),
+ step('tone','4. 올바른 해석 문장 고르기',mcq('tone',['새 메뉴 때문에 만족도가 올랐다.','만족도 변화는 새 메뉴 때문일 수 있으나, 조사 대상 차이 등이 있어 단정하기보다 추가 조사가 필요하다.','이 자료는 완벽히 믿을 수 있다.'],'만족도 변화는 새 메뉴 때문일 수 있으나, 조사 대상 차이 등이 있어 단정하기보다 추가 조사가 필요하다.','‘~일 수 있다’처럼 가능성으로 표현합니다.')),
+ step('rep','5. 사건 보고서 쓰기',txt('r1','수정 제안','신뢰하려면 ___을(를) 추가·수정해야 한다.'),txt('r2','최종 해석','이 자료는 ___ 때문일 수 있으며, ___라고 단정하기보다 추가 조사가 필요하다.',true),txt('r3','성찰 한 문장','나는 그래프를 볼 때 ___를 가장 먼저 확인하겠다.'))
+);
+const repChk=()=>{if(['r1','r2','r3'].every(k=>(T[k]||'').trim()))mark('rep');};['r1','r2','r3'].forEach(k=>$(k).addEventListener('input',repChk));
+
+/* ---------- 기록 ---------- */
+const v=id=>(T[id]||'').trim()||'(미작성)';
+function renderRecord(){
+  $('record').textContent=[`[이름] ${v('who')}`,`[처음 주장] ${v('claim')}`,`[처음 투표] ${P.vote0||'(미선택)'} / 이유: ${v('vote0why')}`,`[믿기 어려운 이유] ${v('why1')}`,
+   `[미션 1] ${v('a1')}`,`[미션 2] 제3변수: ${v('a2a')}, ${v('a2b')}`,`[미션 3] 시작점 ${DONE.has('m3b')?'18,000원':'(미완료)'} / 효과: ${v('a3')}`,`[미션 4] ${v('a4')}`,`[미션 5] ${v('a5')}`,
+   `[체크리스트] ${ck.map((x,i)=>x?`${i+1}${x}`:null).filter(Boolean).join(' ')||'(미표시)'}`,`[위험 TOP2] ${T.top1||'-'}번: ${v('top1w')} / ${T.top2||'-'}번: ${v('top2w')}`,
+   `[최종 판정] ${P.vote1||'(미선택)'} / ${v('ev')}`,`[수정 제안] ${v('r1')}`,`[최종 해석] ${v('r2')}`,`[성찰] ${v('r3')}`].join('\n');
+}
+$('who').addEventListener('input',e=>{T.who=e.target.value;renderRecord();});
+$('copyRec').onclick=async()=>{const t=$('record').textContent;try{await navigator.clipboard.writeText(t);$('recFb').textContent='복사했습니다.';}catch(e){const r=document.createRange();r.selectNodeContents($('record'));const g=getSelection();g.removeAllRanges();g.addRange(r);$('recFb').textContent='자동 복사가 막혔습니다. 선택된 글을 Ctrl+C로 복사하세요.';}};
+
+/* ---------- 화면 전환 ---------- */
+const VIEWS=['case','basic','mission','check','close'];
+function route(){const h=location.hash.slice(1),w=VIEWS.includes(h)?h:'case';VIEWS.forEach(n=>$('v-'+n).classList.toggle('on',n===w));
+  document.querySelectorAll('nav.tabs a').forEach(a=>{if(a.dataset.v===w)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
+  if(h)scrollTo(0,0);}
+addEventListener('hashchange',route);
+showM();ckDraw();fixDraw();renderRecord();prog();route();
+</script>
+</body>
+</html>
